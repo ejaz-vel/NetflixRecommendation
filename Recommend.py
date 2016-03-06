@@ -2,6 +2,7 @@ from scipy.sparse import csr_matrix
 import math
 import time
 import os
+import pmf
 
 imputationConstant = 3
 globalUserDict = {}
@@ -25,7 +26,8 @@ def computeDotProduct(vector1, vector2):
 
 def standardizeMatrixRow(data, lastUpdated, current):
 	mean = (sum(data[lastUpdated:current]) + 0.0) / len(data[lastUpdated:current])
-	data[lastUpdated:current] = [(x - mean) for x in data[lastUpdated:current]]
+	valuesRange = math.sqrt(sum(map(lambda x:x*x,data[lastUpdated:current])))
+	data[lastUpdated:current] = [(x - mean)/valuesRange for x in data[lastUpdated:current]]
 
 def getUserVectors(standardizationRequired = False):
 	row = []
@@ -77,9 +79,10 @@ def computeItemAssociationsUsingCosineSimilarity(userVectors, numMovies):
 		f = open("itemAssociations.txt")
 		for line in iter(f):
 			element = line.split()
-			row.append(str(element[0]))
-			col.append(str(element[1]))
-			data.append(str(element[1]))
+			if float(element[2]) > 0:
+				row.append(int(element[0]))
+				col.append(int(element[1]))
+				data.append(float(element[2]))
 	else:
 		for movieIDRow in range(numMovies):
 			if userVectors.getcol(movieIDRow).nnz == 0:
@@ -184,7 +187,7 @@ def predictRatingsUsingUserSimilarity(useDotProduct=True, useWeightedMean=True):
 		movieID = int(line.split(",")[0])
 		userID = int(line.split(",")[1])
 		print "Computing Prediction for user-movie: " + str(userID) + "-" + str(movieID)
-		neighbourList = findKSimilarUsers(10, userID, userVectors, numUsers, useDotProduct)
+		neighbourList = findKSimilarUsers(100, userID, userVectors, numUsers, useDotProduct)
 		
 		rating = 0
 		if useWeightedMean is True:
@@ -231,8 +234,8 @@ def getWeighedMeanRating(userID, movieID, neighbourList, itemAssociations, userV
 	print sumOfRatings
 	return sumOfRatings + imputationConstant
 
-def predictRatingsUsingMovieSimilarity(useDotProduct=True, useWeightedMean=True):
-	[numUsers, numMovies, userVectors] = getUserVectors()
+def predictRatingsUsingMovieSimilarity(useDotProduct=True, useWeightedMean=True, standardizationRequired=False):
+	[numUsers, numMovies, userVectors] = getUserVectors(standardizationRequired)
 	itemAssociations = []
 	if useDotProduct is True:
 		itemAssociations = computeItemAssociationsUsingDotProduct(userVectors)
@@ -247,12 +250,31 @@ def predictRatingsUsingMovieSimilarity(useDotProduct=True, useWeightedMean=True)
 		movieID = int(line.split(",")[0])
 		userID = int(line.split(",")[1])
 		print "Computing Prediction for user-movie: " + str(userID) + "-" + str(movieID)
-		neighbourList = findKSimilarMovies(500, movieID, itemAssociations, numMovies)
+		neighbourList = findKSimilarMovies(20, movieID, itemAssociations, numMovies)
 		rating = 0
 		if useWeightedMean is True:
 			rating = getWeighedMeanRating(userID, movieID, neighbourList, itemAssociations, userVectors)
 		else:
 			rating = getMeanRating(userID, movieID, neighbourList, itemAssociations, userVectors)
+		ratingsFile.write(str(rating) + "\n")
+	f.close()
+	ratingsFile.close()
+	afterTime = time.time()
+	print "Time Taken for online Computation: " + str(afterTime - beforeTime)
+
+def predictRatingsByPMF():
+	[numUsers, numMovies, userVectors] = getUserVectors()
+	[U, V] = pmf.factorizeMatix(userVectors)
+	prediction = U.transpose() * V
+	
+	ratingsFile = open("ratings.txt", "w")
+	f = open("HW4_data/dev.csv")
+	beforeTime = time.time()
+	for line in iter(f):
+		movieID = int(line.split(",")[0])
+		userID = int(line.split(",")[1])
+		rating = prediction.getrow(userID).getcol(movieID).data[0] + imputationConstant
+		print "Computing Prediction for user-movie: " + str(userID) + "-" + str(movieID) + "=" + str(rating)
 		ratingsFile.write(str(rating) + "\n")
 	f.close()
 	ratingsFile.close()
