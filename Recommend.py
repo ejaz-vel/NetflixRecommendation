@@ -3,6 +3,7 @@ import math
 import time
 import os
 import pmf
+import numpy as np
 
 imputationConstant = 3
 globalUserDict = {}
@@ -264,17 +265,16 @@ def predictRatingsUsingMovieSimilarity(useDotProduct=True, useWeightedMean=True,
 
 def predictRatingsByPMF():
 	[numUsers, numMovies, userVectors] = getUserVectors()
+	beforeTime = time.time()
 	[U, V] = pmf.factorizeMatix(userVectors)
-	prediction = U.transpose() * V
+	prediction = np.dot(U.transpose(), V)
 	
 	ratingsFile = open("ratings.txt", "w")
 	f = open("HW4_data/dev.csv")
-	beforeTime = time.time()
 	for line in iter(f):
 		movieID = int(line.split(",")[0])
 		userID = int(line.split(",")[1])
-		rating = prediction.getrow(userID).getcol(movieID).data[0] + imputationConstant
-		print "Computing Prediction for user-movie: " + str(userID) + "-" + str(movieID) + "=" + str(rating)
+		rating = prediction[userID, movieID] + imputationConstant
 		ratingsFile.write(str(rating) + "\n")
 	f.close()
 	ratingsFile.close()
