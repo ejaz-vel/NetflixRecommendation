@@ -5,9 +5,13 @@ import os
 import pmf
 import numpy as np
 
+trainingFile = "HW4_data/dev.queries"
+testingFile = "HW4_data/dev.csv"
+
 imputationConstant = 3
 globalUserDict = {}
 globalMovieDict = {}
+userAverageRating = {}
 
 def computeCosineSimilarity(vector1, vector2):
 	sim = vector1.dot(vector2.T)
@@ -25,10 +29,10 @@ def computeDotProduct(vector1, vector2):
 	else:
 		return float(sim.data[0])
 
-def standardizeMatrixRow(data, lastUpdated, current):
+def standardizeMatrixRow(userID, data, lastUpdated, current):
 	mean = (sum(data[lastUpdated:current]) + 0.0) / len(data[lastUpdated:current])
-	valuesRange = math.sqrt(sum(map(lambda x:x*x,data[lastUpdated:current])))
-	data[lastUpdated:current] = [(x - mean)/valuesRange for x in data[lastUpdated:current]]
+	userAverageRating[userID] = mean
+	data[lastUpdated:current] = [(x - mean) for x in data[lastUpdated:current]]
 
 def getUserVectors(standardizationRequired = False):
 	row = []
@@ -39,16 +43,19 @@ def getUserVectors(standardizationRequired = False):
 	numMovies = 0
 	lastUpdatedIndex = 0
 	currentIndex = 0
-	f = open("HW4_data/dev.queries")
+	f = open(trainingFile)
 	for line in iter(f):
 		userData = line.split()
 		userID = int(userData[0])
 		lastUpdatedIndex = currentIndex
 		for rating in userData[1:]:
 			movieID = int(rating.split(":")[0])
-			rating = int(rating.split(":")[1]) - imputationConstant
+			rating = int(rating.split(":")[1])
+			if not standardizationRequired is True:
+				rating -= imputationConstant
 			if(rating == 0):
 				continue
+				
 			if numMovies < movieID:
 				numMovies = movieID
 			row.append(userID)
@@ -56,7 +63,7 @@ def getUserVectors(standardizationRequired = False):
 			data.append(rating)
 			currentIndex += 1
 		if standardizationRequired is True and lastUpdatedIndex != currentIndex:
-			standardizeMatrixRow(data, lastUpdatedIndex, currentIndex)
+			standardizeMatrixRow(userID, data, lastUpdatedIndex, currentIndex)
 		if numRows < userID:
 			numRows = userID
 	f.close()
@@ -64,7 +71,6 @@ def getUserVectors(standardizationRequired = False):
 	numRows += 1
 	numMovies += 1
 	userVectors = csr_matrix((data, (row, col)), shape=(numRows, numMovies))
-	
 	return numRows, numMovies, userVectors
 		
 def computeItemAssociationsUsingDotProduct(userVectors):
@@ -181,7 +187,7 @@ def computePredictionUsingWeightedMean(movieID, neighbourList, userVectors):
 def predictRatingsUsingUserSimilarity(useDotProduct=True, useWeightedMean=True):
 	[numUsers, numMovies, userVectors] = getUserVectors()
 	ratingsFile = open("ratings.txt", "w")
-	f = open("HW4_data/dev.csv")
+	f = open(testingFile)
 	
 	beforeTime = time.time()
 	for line in iter(f):
@@ -213,7 +219,9 @@ def getMeanRating(userID, movieID, neighbourList, itemAssociations, userVectors)
 		movie = user.getcol(neighbour[0])
 		if movie.nnz != 0:
 			sumOfRatings += (weight * movie.data[0])
-	print sumOfRatings
+			
+	if userID in userAverageRating:
+		return sumOfRatings + userAverageRating[userID]
 	return sumOfRatings + imputationConstant
 	
 def getWeighedMeanRating(userID, movieID, neighbourList, itemAssociations, userVectors):
@@ -232,11 +240,14 @@ def getWeighedMeanRating(userID, movieID, neighbourList, itemAssociations, userV
 				
 	if runningSum != 0:
 		sumOfRatings /= (runningSum + 0.0)
-	print sumOfRatings
+		
+	if userID in userAverageRating:
+		return sumOfRatings + userAverageRating[userID]
 	return sumOfRatings + imputationConstant
 
 def predictRatingsUsingMovieSimilarity(useDotProduct=True, useWeightedMean=True, standardizationRequired=False):
 	[numUsers, numMovies, userVectors] = getUserVectors(standardizationRequired)
+		
 	itemAssociations = []
 	if useDotProduct is True:
 		itemAssociations = computeItemAssociationsUsingDotProduct(userVectors)
@@ -244,14 +255,14 @@ def predictRatingsUsingMovieSimilarity(useDotProduct=True, useWeightedMean=True,
 		itemAssociations = computeItemAssociationsUsingCosineSimilarity(userVectors, numMovies)
 
 	ratingsFile = open("ratings.txt", "w")
-	f = open("HW4_data/dev.csv")
+	f = open(testingFile)
 
 	beforeTime = time.time()
 	for line in iter(f):
 		movieID = int(line.split(",")[0])
 		userID = int(line.split(",")[1])
 		print "Computing Prediction for user-movie: " + str(userID) + "-" + str(movieID)
-		neighbourList = findKSimilarMovies(20, movieID, itemAssociations, numMovies)
+		neighbourList = findKSimilarMovies(10, movieID, itemAssociations, numMovies)
 		rating = 0
 		if useWeightedMean is True:
 			rating = getWeighedMeanRating(userID, movieID, neighbourList, itemAssociations, userVectors)
@@ -263,18 +274,22 @@ def predictRatingsUsingMovieSimilarity(useDotProduct=True, useWeightedMean=True,
 	afterTime = time.time()
 	print "Time Taken for online Computation: " + str(afterTime - beforeTime)
 
-def predictRatingsByPMF():
-	[numUsers, numMovies, userVectors] = getUserVectors()
+def predictRatingsByPMF(standardizationRequired=False):
+	[numUsers, numMovies, userVectors] = getUserVectors(standardizationRequired)
 	beforeTime = time.time()
 	[U, V] = pmf.factorizeMatix(userVectors)
 	prediction = np.dot(U.transpose(), V)
 	
 	ratingsFile = open("ratings.txt", "w")
-	f = open("HW4_data/dev.csv")
+	f = open(testingFile)
 	for line in iter(f):
 		movieID = int(line.split(",")[0])
 		userID = int(line.split(",")[1])
-		rating = prediction[userID, movieID] + imputationConstant
+		rating = prediction[userID, movieID]
+		if userID in userAverageRating:
+			rating += userAverageRating[userID]
+		else:
+			rating += imputationConstant
 		ratingsFile.write(str(rating) + "\n")
 	f.close()
 	ratingsFile.close()

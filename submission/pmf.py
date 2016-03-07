@@ -37,20 +37,20 @@ def performGD(U, V, actualRatings, lambdaU, lambdaV):
 	return userGradient, movieGradient, ratingDiff
 
 def factorizeMatix(userVectors):
-	latentFactors = 20
+	latentFactors = 6
 	[numUsers, numMovies] = userVectors.shape
 	U = np.random.rand(latentFactors, numUsers)
 	V = np.random.rand(latentFactors, numMovies)
 	actualRatings = coo_matrix(userVectors)
 	
-	lambdaU = 0.1
-	lambdaV = 0.1
+	lambdaU = 1
+	lambdaV = 1
 	learningRate = 0.00018
 	loss = 99
 	prevloss = loss
 	iteration = 0
 	
-	while (prevloss - loss) > 0.00025 or iteration is 0:
+	while (prevloss - loss) > 0.0002 or iteration < 10:
 		prevloss = loss
 		iteration += 1
 		[userGradient, movieGradient, ratingDiff] = performGD(U, V, actualRatings, lambdaU, lambdaV)
