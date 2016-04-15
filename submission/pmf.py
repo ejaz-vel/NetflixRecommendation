@@ -2,12 +2,14 @@ from scipy.sparse import csr_matrix, coo_matrix, linalg
 import math
 import numpy as np
 
+# Compute the value of the loss function.
 def computeLoss(ratingDiff, U, V, lambdaU, lambdaV):
 	loss = (0.5 * math.pow(linalg.norm(ratingDiff),2))
 	loss += (0.5 * lambdaU * math.pow(np.linalg.norm(U),2))
 	loss += (0.5 * lambdaV * math.pow(np.linalg.norm(V),2))
 	return loss/(ratingDiff.nnz + 0.0)
-                                                              
+
+# Perform Batch gradient descent to optimize the paramters U and V.
 def performGD(U, V, actualRatings, lambdaU, lambdaV):
 	userGradient = {}
 	movieGradient = {}
@@ -36,8 +38,9 @@ def performGD(U, V, actualRatings, lambdaU, lambdaV):
 	ratingDiff = csr_matrix((data, (row, col)), shape=actualRatings.shape)
 	return userGradient, movieGradient, ratingDiff
 
+# Factorize the user-movie matrix into it's factors.
 def factorizeMatix(userVectors):
-	latentFactors = 6
+	latentFactors = 5
 	[numUsers, numMovies] = userVectors.shape
 	U = np.random.rand(latentFactors, numUsers)
 	V = np.random.rand(latentFactors, numMovies)
