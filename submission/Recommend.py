@@ -346,12 +346,21 @@ def generateFeaturesForLetor(standardizationRequired=False):
 			for movieJ in range(numMovies):
 				if movieI == movieJ:
 					continue
+				
+				predictionYi = prediction[user, movieI]
+				predictionYj = prediction[user, movieJ]
+				if user in userAverageRating:
+					predictionYi += userAverageRating[userID]
+					predictionYj += userAverageRating[userID]
+				else:
+					predictionYi += imputationConstant
+					predictionYj += imputationConstant
 					
-				if abs(prediction[user, movieI] - prediction[user, movieJ]) < 4:
+				if abs(predictionYi - predictionYj) < 4:
 					continue
 				
 				# Generate Feature and write to a file
-				y = math.copysign(1, prediction[user, movieI] - prediction[user, movieJ])
+				y = math.copysign(1, predictionYi - predictionYj)
 				
 				numTrainingExamples += 1
 				if y > 0:
