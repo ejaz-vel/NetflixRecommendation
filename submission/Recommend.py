@@ -322,3 +322,62 @@ def predictRatingsByPMF(standardizationRequired=False):
 	ratingsFile.close()
 	afterTime = time.time()
 	print "Time Taken for online Computation: " + str(afterTime - beforeTime)
+
+def getFeatureVector(U, V, user, movie):
+	userVector = U.T[user]
+	movieVector = V.T[movie]
+	return np.multiply(userVector, movieVector)
+
+def generateFeaturesForLetor(standardizationRequired=False):
+	[numUsers, numMovies, userVectors] = getUserVectors(standardizationRequired)
+	[U, V] = pmf.factorizeMatix(userVectors)
+	prediction = np.dot(U.transpose(), V)
+	
+	numPositiveExamples = 0
+	numNegativeExamples = 0
+	numExamplesUser1234 = 0
+	numExamplesUser4321 = 0
+	numTrainingExamples = 0
+	
+	featureFile = open("features.txt", "w")
+	for user in range(numUsers):
+		print "Generating Features for User: " + str(user)
+		for movieI in range(numMovies):
+			for movieJ in range(numMovies):
+				if movieI == movieJ:
+					continue
+					
+				if abs(prediction[user, movieI] - prediction[user, movieJ]) < 4:
+					continue
+				
+				# Generate Feature and write to a file
+				y = math.copysign(1, prediction[user, movieI] - prediction[user, movieJ])
+				
+				numTrainingExamples += 1
+				if y > 0:
+					numPositiveExamples += 1
+				elif y < 0:
+					numNegativeExamples += 1
+				
+				if user == 1234:
+					numExamplesUser1234 += 1
+				elif user == 4321:
+					numExamplesUser4321 += 1
+				
+				Xi = getFeatureVector(U, V, user, movieI)
+				Xj = getFeatureVector(U, V, user, movieJ)
+				Vij = Xi - Xj
+				feature = str(y) + " "
+				featureID = 1
+				for num in Vij:
+					feature += str(featureID) + ":"
+					feature += str(num) + " "
+					featureID += 1
+				featureFile.write(feature.strip() + "\n")
+	featureFile.close()
+	print "Number of Training Examples: " + str(numTrainingExamples)
+	print "Number of Positive Examples: " + str(numPositiveExamples)
+	print "Number of Negative Examples: " + str(numNegativeExamples)
+	print "Ratio of positive to negative: " + str((numPositiveExamples + 0.0) / numNegativeExamples)
+	print "Number of Examples for 1234: " + str(numExamplesUser1234)
+	print "Number of Examples for 4321: " + str(numExamplesUser4321)
