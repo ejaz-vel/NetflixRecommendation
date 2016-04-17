@@ -40,7 +40,7 @@ def performGD(U, V, actualRatings, lambdaU, lambdaV):
 
 # Factorize the user-movie matrix into it's factors.
 def factorizeMatix(userVectors):
-	latentFactors = 5
+	latentFactors = 10
 	[numUsers, numMovies] = userVectors.shape
 	U = np.random.rand(latentFactors, numUsers)
 	V = np.random.rand(latentFactors, numMovies)

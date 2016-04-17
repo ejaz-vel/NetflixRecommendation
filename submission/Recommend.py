@@ -4,6 +4,7 @@ import time
 import os
 import pmf
 import numpy as np
+import LetorFeatures
 
 trainingFile = "HW4_data/dev.queries"
 testingFile = "HW4_data/dev.csv"
@@ -171,7 +172,7 @@ def findKSimilarMovies(k, movieID, itemAssociations, numMovies):
 	return globalMovieDict[movieID]
 
 # Use the mean weighting scheme to compute the rating for the movieID.
-def computePredictionUsingMean(movieID, neighbourList, userVectors):
+def computePredictionUsingMean(userID, movieID, neighbourList, userVectors):
 	sumOfRatings = 0
 	k = len(neighbourList)
 	
@@ -183,11 +184,13 @@ def computePredictionUsingMean(movieID, neighbourList, userVectors):
 		movie = user.getcol(movieID)
 		if movie.nnz != 0:
 			sumOfRatings += (weight * movie.data[0])
-	print sumOfRatings
+			
+	if userID in userAverageRating:
+		return sumOfRatings + userAverageRating[userID]
 	return sumOfRatings + imputationConstant
 
 # Use the weighted mean weighting scheme to compute the rating for the movieID.
-def computePredictionUsingWeightedMean(movieID, neighbourList, userVectors):
+def computePredictionUsingWeightedMean(userID, movieID, neighbourList, userVectors):
 	sumOfRatings = 0
 	runningSum = 0
 	
@@ -202,12 +205,14 @@ def computePredictionUsingWeightedMean(movieID, neighbourList, userVectors):
 	
 	if runningSum != 0:
 		sumOfRatings /= runningSum
-	print sumOfRatings
+		
+	if userID in userAverageRating:
+		return sumOfRatings + userAverageRating[userID]
 	return sumOfRatings + imputationConstant
 
 # API for user-user similarity: You can use the arguments of this API to decide what similarity metric or weighting scheme to use. 
 def predictRatingsUsingUserSimilarity(useDotProduct=True, useWeightedMean=True):
-	[numUsers, numMovies, userVectors] = getUserVectors()
+	[numUsers, numMovies, userVectors] = getUserVectors(True)
 	ratingsFile = open("ratings.txt", "w")
 	f = open(testingFile)
 	
@@ -216,13 +221,13 @@ def predictRatingsUsingUserSimilarity(useDotProduct=True, useWeightedMean=True):
 		movieID = int(line.split(",")[0])
 		userID = int(line.split(",")[1])
 		print "Computing Prediction for user-movie: " + str(userID) + "-" + str(movieID)
-		neighbourList = findKSimilarUsers(10, userID, userVectors, numUsers, useDotProduct)
+		neighbourList = findKSimilarUsers(500, userID, userVectors, numUsers, useDotProduct)
 		
 		rating = 0
 		if useWeightedMean is True:
-			rating = computePredictionUsingWeightedMean(movieID, neighbourList, userVectors)
+			rating = computePredictionUsingWeightedMean(userID, movieID, neighbourList, userVectors)
 		else:
-			rating = computePredictionUsingMean(movieID, neighbourList, userVectors)
+			rating = computePredictionUsingMean(userID, movieID, neighbourList, userVectors)
 		ratingsFile.write(str(rating) + "\n")
 	f.close()
 	ratingsFile.close()
@@ -280,7 +285,7 @@ def predictRatingsUsingMovieSimilarity(useDotProduct=True, useWeightedMean=True,
 	else:
 		itemAssociations = computeItemAssociationsUsingCosineSimilarity(userVectors, numMovies)
 
-	ratingsFile = open("ratings.txt", "w")
+	ratingsFile = open("ratingsMovies.txt", "w")
 	f = open(testingFile)
 
 	beforeTime = time.time()
@@ -323,70 +328,28 @@ def predictRatingsByPMF(standardizationRequired=False):
 	afterTime = time.time()
 	print "Time Taken for online Computation: " + str(afterTime - beforeTime)
 
-def getFeatureVector(U, V, user, movie):
-	userVector = U.T[user]
-	movieVector = V.T[movie]
-	return np.multiply(userVector, movieVector)
+def writeUserAndMovieFactors(U, V):
+	[factors, users] = U.shape
+	movies = V.shape[1]
+	
+	userFactors = open("userFactors.txt", "w")
+	for userID in range(users):
+		line = ""
+		for num in U.T[userID]:
+			line += str(num) + " "
+		userFactors.write(line.strip() + "\n")
+	userFactors.close()
+	
+	movieFactors = open("movieFactors.txt", "w")
+	for movieID in range(movies):
+		line = ""
+		for num in V.T[movieID]:
+			line += str(num) + " "
+		movieFactors.write(line.strip() + "\n")
+	movieFactors.close()
 
 def generateFeaturesForLetor(standardizationRequired=False):
 	[numUsers, numMovies, userVectors] = getUserVectors(standardizationRequired)
 	[U, V] = pmf.factorizeMatix(userVectors)
-	prediction = np.dot(U.transpose(), V)
-	
-	numPositiveExamples = 0
-	numNegativeExamples = 0
-	numExamplesUser1234 = 0
-	numExamplesUser4321 = 0
-	numTrainingExamples = 0
-	
-	featureFile = open("features.txt", "w")
-	for user in range(numUsers):
-		print "Generating Features for User: " + str(user)
-		for movieI in range(numMovies):
-			for movieJ in range(numMovies):
-				if movieI == movieJ:
-					continue
-				
-				predictionYi = prediction[user, movieI]
-				predictionYj = prediction[user, movieJ]
-				if user in userAverageRating:
-					predictionYi += userAverageRating[userID]
-					predictionYj += userAverageRating[userID]
-				else:
-					predictionYi += imputationConstant
-					predictionYj += imputationConstant
-					
-				if abs(predictionYi - predictionYj) < 4:
-					continue
-				
-				# Generate Feature and write to a file
-				y = math.copysign(1, predictionYi - predictionYj)
-				
-				numTrainingExamples += 1
-				if y > 0:
-					numPositiveExamples += 1
-				elif y < 0:
-					numNegativeExamples += 1
-				
-				if user == 1234:
-					numExamplesUser1234 += 1
-				elif user == 4321:
-					numExamplesUser4321 += 1
-				
-				Xi = getFeatureVector(U, V, user, movieI)
-				Xj = getFeatureVector(U, V, user, movieJ)
-				Vij = Xi - Xj
-				feature = str(y) + " "
-				featureID = 1
-				for num in Vij:
-					feature += str(featureID) + ":"
-					feature += str(num) + " "
-					featureID += 1
-				featureFile.write(feature.strip() + "\n")
-	featureFile.close()
-	print "Number of Training Examples: " + str(numTrainingExamples)
-	print "Number of Positive Examples: " + str(numPositiveExamples)
-	print "Number of Negative Examples: " + str(numNegativeExamples)
-	print "Ratio of positive to negative: " + str((numPositiveExamples + 0.0) / numNegativeExamples)
-	print "Number of Examples for 1234: " + str(numExamplesUser1234)
-	print "Number of Examples for 4321: " + str(numExamplesUser4321)
+	writeUserAndMovieFactors(U, V)
+	LetorFeatures.generateLetorFeatures(U, V)
