@@ -1,6 +1,6 @@
 from scipy.sparse import csr_matrix
 
-f = open("HW4_data/train.csv")
+f = open("data/train.csv")
 numUsers = 0
 numMovies = 0
 sumOfRatings = 0
