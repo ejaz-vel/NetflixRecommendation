@@ -2,6 +2,8 @@ from scipy.sparse import csr_matrix
 import math
 import numpy as np
 
+trainingFile = "data/train.csv"
+
 # Read the Latent Factor Matrix from the file
 # Depending on what file is passed as input, this API will load either the user or movie latent factors matrix
 # @fileName: The file which stores the Latent Factors of the entity (user/movie)
@@ -63,7 +65,7 @@ def generateLetorFeatures(U, V):
 	numUsers = 0
 	numMovies = 0
 	# The training file containing the observed ratings
-	f = open("HW4_data/train.csv")
+	f = open(trainingFile)
 	
 	for line in iter(f):
 		element = line.split(",")

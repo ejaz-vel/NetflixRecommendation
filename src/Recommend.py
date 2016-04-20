@@ -6,8 +6,8 @@ import pmf
 import numpy as np
 import LetorFeatures
 
-trainingFile = "HW4_data/dev.queries"
-testingFile = "HW4_data/dev.csv"
+trainingFile = "data/dev.queries"
+testingFile = "data/dev.csv"
 
 imputationConstant = 3
 globalUserDict = {}
