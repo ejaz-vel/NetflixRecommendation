@@ -211,8 +211,8 @@ def computePredictionUsingWeightedMean(userID, movieID, neighbourList, userVecto
 	return sumOfRatings + imputationConstant
 
 # API for user-user similarity: You can use the arguments of this API to decide what similarity metric or weighting scheme to use. 
-def predictRatingsUsingUserSimilarity(useDotProduct=True, useWeightedMean=True):
-	[numUsers, numMovies, userVectors] = getUserVectors(True)
+def predictRatingsUsingUserSimilarity(useDotProduct=True, useWeightedMean=True, standardizationRequired=False):
+	[numUsers, numMovies, userVectors] = getUserVectors(standardizationRequired)
 	ratingsFile = open("ratings.txt", "w")
 	f = open(testingFile)
 	
@@ -221,7 +221,7 @@ def predictRatingsUsingUserSimilarity(useDotProduct=True, useWeightedMean=True):
 		movieID = int(line.split(",")[0])
 		userID = int(line.split(",")[1])
 		print "Computing Prediction for user-movie: " + str(userID) + "-" + str(movieID)
-		neighbourList = findKSimilarUsers(500, userID, userVectors, numUsers, useDotProduct)
+		neighbourList = findKSimilarUsers(10, userID, userVectors, numUsers, useDotProduct)
 		
 		rating = 0
 		if useWeightedMean is True:
@@ -328,6 +328,7 @@ def predictRatingsByPMF(standardizationRequired=False):
 	afterTime = time.time()
 	print "Time Taken for online Computation: " + str(afterTime - beforeTime)
 
+# Writee the learned user and movie factors to disk
 def writeUserAndMovieFactors(U, V):
 	[factors, users] = U.shape
 	movies = V.shape[1]
@@ -348,6 +349,7 @@ def writeUserAndMovieFactors(U, V):
 		movieFactors.write(line.strip() + "\n")
 	movieFactors.close()
 
+# API for generating the features required for Learning to Rank
 def generateFeaturesForLetor(standardizationRequired=False):
 	[numUsers, numMovies, userVectors] = getUserVectors(standardizationRequired)
 	[U, V] = pmf.factorizeMatix(userVectors)
